@@ -1,0 +1,139 @@
+// Data model for the document chaser.
+//
+// A Firm is the accountant/bookkeeper/paralegal account. Each Firm has many
+// Clients, who never log in anywhere — all interaction happens over SMS or
+// WhatsApp. A Firm defines DocumentRequests (checklist items) per Client,
+// e.g. "2025 W-2" or "January bank statement". When a Client texts in a
+// photo or PDF, it becomes an IncomingDocument, gets classified by the
+// vision/LLM pipeline, and — if confident — is matched to an open
+// DocumentRequest, closing it out. ReminderLogs record the escalating
+// nudges sent for still-open requests.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RequestStatus {
+  PENDING
+  RECEIVED
+  WAIVED
+}
+
+enum ReminderLevel {
+  GENTLE
+  FIRM
+  URGENT
+  ESCALATED_TO_FIRM
+}
+
+enum DocumentType {
+  W2
+  FORM_1099
+  K1
+  BANK_STATEMENT
+  RECEIPT
+  INVOICE
+  PAYSTUB
+  TAX_RETURN_PRIOR_YEAR
+  ID_DOCUMENT
+  MORTGAGE_STATEMENT
+  OTHER
+}
+
+enum Channel {
+  SMS
+  WHATSAPP
+}
+
+model Firm {
+  id          String   @id @default(cuid())
+  name        String
+  ownerEmail  String   @unique
+  timezone    String   @default("America/New_York")
+  createdAt   DateTime @default(now())
+
+  clients           Client[]
+  documentRequests  DocumentRequest[]
+}
+
+model Client {
+  id          String   @id @default(cuid())
+  firmId      String
+  firm        Firm     @relation(fields: [firmId], references: [id])
+  name        String
+  phone       String
+  preferredChannel Channel @default(SMS)
+  createdAt   DateTime @default(now())
+
+  documentRequests   DocumentRequest[]
+  incomingDocuments  IncomingDocument[]
+
+  @@unique([firmId, phone])
+  @@index([firmId])
+}
+
+model DocumentRequest {
+  id            String        @id @default(cuid())
+  firmId        String
+  firm          Firm          @relation(fields: [firmId], references: [id])
+  clientId      String
+  client        Client        @relation(fields: [clientId], references: [id])
+  docType       DocumentType
+  label         String        // human label, e.g. "2025 W-2" or "Jan Chase statement"
+  period        String?       // free-text period hint used for matching, e.g. "2025", "January 2026"
+  dueDate       DateTime
+  status        RequestStatus @default(PENDING)
+  remindersSent Int           @default(0)
+  lastReminderAt DateTime?
+  receivedAt    DateTime?
+  createdAt     DateTime      @default(now())
+
+  matchedDocuments IncomingDocument[]
+  reminderLogs     ReminderLog[]
+
+  @@index([firmId, status])
+  @@index([clientId, status])
+}
+
+model IncomingDocument {
+  id                String        @id @default(cuid())
+  clientId          String
+  client            Client        @relation(fields: [clientId], references: [id])
+  channel           Channel
+  mediaUrl          String
+  mediaContentType  String?
+  rawMessageSid     String?
+
+  // Vision/LLM classification results
+  classifiedType    DocumentType?
+  classifiedPeriod  String?
+  classifiedEntity  String?       // e.g. employer or bank name found on the document
+  confidence        Float?
+  classificationRaw String?       // raw JSON response, kept for debugging/audit
+
+  matchedRequestId  String?
+  matchedRequest    DocumentRequest? @relation(fields: [matchedRequestId], references: [id])
+  needsReview       Boolean       @default(false)
+
+  receivedAt        DateTime      @default(now())
+
+  @@index([clientId])
+  @@index([matchedRequestId])
+}
+
+model ReminderLog {
+  id                String          @id @default(cuid())
+  documentRequestId String
+  documentRequest   DocumentRequest @relation(fields: [documentRequestId], references: [id])
+  level             ReminderLevel
+  channel           Channel
+  message           String
+  sentAt            DateTime        @default(now())
+
+  @@index([documentRequestId])
+}
