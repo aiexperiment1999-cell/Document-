@@ -3,6 +3,17 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 
+// An empty/missing secret doesn't fail cleanly — NextAuth logs a quiet
+// warning, then crashes inside its own JWT encryption with a cryptic
+// `"ikm" must be at least one byte in length`, which surfaces to the
+// browser as an empty 500 response and an even more cryptic "Unexpected
+// end of JSON input". Fail loudly here instead, with the actual fix.
+if (!process.env.NEXTAUTH_SECRET) {
+  throw new Error(
+    "NEXTAUTH_SECRET is not set. Generate one with `openssl rand -base64 32` and add it to your .env.",
+  );
+}
+
 export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
