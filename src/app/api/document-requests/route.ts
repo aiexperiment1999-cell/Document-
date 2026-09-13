@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getDefaultFirm } from "@/lib/firm";
+import { getFirmSession } from "@/lib/session";
 import { DocumentType } from "@prisma/client";
 
 export async function GET(req: NextRequest) {
-  const firm = await getDefaultFirm();
+  const session = await getFirmSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const status = req.nextUrl.searchParams.get("status");
 
   const requests = await prisma.documentRequest.findMany({
     where: {
-      firmId: firm.id,
+      firmId: session.user.firmId,
       ...(status ? { status: status as "PENDING" | "RECEIVED" | "WAIVED" } : {}),
     },
     include: { client: true },
@@ -19,9 +21,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const firm = await getDefaultFirm();
-  const body = await req.json();
+  const session = await getFirmSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const body = await req.json();
   if (!body.clientId || !body.docType || !body.label || !body.dueDate) {
     return NextResponse.json(
       { error: "clientId, docType, label, and dueDate are required" },
@@ -32,9 +35,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Unknown docType: ${body.docType}` }, { status: 400 });
   }
 
+  const client = await prisma.client.findUnique({ where: { id: body.clientId } });
+  if (!client || client.firmId !== session.user.firmId) {
+    return NextResponse.json({ error: "Unknown clientId" }, { status: 404 });
+  }
+
   const documentRequest = await prisma.documentRequest.create({
     data: {
-      firmId: firm.id,
+      firmId: session.user.firmId,
       clientId: body.clientId,
       docType: body.docType,
       label: body.label,

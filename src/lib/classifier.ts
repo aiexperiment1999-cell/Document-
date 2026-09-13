@@ -22,6 +22,11 @@ export interface ClassificationResult {
   period: string | null;
   entity: string | null;
   confidence: number;
+  /** Short, human-readable note — populated whenever the document doesn't
+   *  cleanly match anything, so the client can be told specifically what's
+   *  wrong (e.g. "this looks like a 2023 statement, not 2024") instead of
+   *  a generic "we're not sure" reply. Null when there's nothing to flag. */
+  reason: string | null;
   raw: string;
 }
 
@@ -46,7 +51,7 @@ Classify it as exactly one of these types:
 ${typeList}
 
 Respond with ONLY a JSON object, no other text, matching this shape:
-{"docType": "<ONE_OF_THE_TYPES_ABOVE>", "period": "<the period this document covers, e.g. '2025' or 'January 2026', or null if unclear>", "entity": "<the employer, bank, or business name printed on the document, or null>", "confidence": <number between 0 and 1>}`;
+{"docType": "<ONE_OF_THE_TYPES_ABOVE>", "period": "<the period this document covers, e.g. '2025' or 'January 2026', or null if unclear>", "entity": "<the employer, bank, or business name printed on the document, or null>", "confidence": <number between 0 and 1>, "reason": "<if something is off — wrong year, wrong document type, illegible, etc. — a short, specific, friendly note to send the client explaining what's wrong and what to resend; otherwise null>"}`;
 }
 
 /**
@@ -107,10 +112,11 @@ export function parseClassification(raw: string): ClassificationResult {
       period: typeof parsed.period === "string" ? parsed.period : null,
       entity: typeof parsed.entity === "string" ? parsed.entity : null,
       confidence,
+      reason: typeof parsed.reason === "string" ? parsed.reason : null,
       raw,
     };
   } catch {
-    return { docType: null, period: null, entity: null, confidence: 0, raw };
+    return { docType: null, period: null, entity: null, confidence: 0, reason: null, raw };
   }
 }
 

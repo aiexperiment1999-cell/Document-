@@ -8,6 +8,21 @@ export interface ReminderContext {
 }
 
 /**
+ * The first message a client ever gets. Carries the opt-in/STOP language
+ * carriers require for business SMS (10DLC compliance) — this only needs
+ * to appear once, not on every follow-up.
+ */
+export function buildOpeningMessage(params: {
+  clientName: string;
+  firmName: string;
+  itemLabels: string[];
+}): string {
+  const { clientName, firmName, itemLabels } = params;
+  const list = itemLabels.map((label) => `- ${label}`).join("\n");
+  return `Hi ${clientName}, this is ${firmName}. To keep things moving we need a few things from you:\n${list}\n\nJust reply to this text with a photo or PDF whenever you have each one — no account or app needed. Reply STOP to opt out at any time.`;
+}
+
+/**
  * Pure copy generator, kept separate from the Twilio call so message
  * wording can be unit tested without network access.
  */

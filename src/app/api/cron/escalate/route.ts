@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
   }
 
   const openRequests = await prisma.documentRequest.findMany({
-    where: { status: "PENDING" },
+    where: { status: "PENDING", client: { remindersPaused: false } },
     include: { client: true, firm: true },
   });
 

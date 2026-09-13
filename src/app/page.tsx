@@ -16,12 +16,17 @@ export default function LandingPage() {
     <main className="mx-auto max-w-5xl px-6 py-16">
       <header className="flex items-center justify-between">
         <span className="text-lg font-semibold tracking-tight">DocChaser</span>
-        <a
-          href="/dashboard"
-          className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
-        >
-          View dashboard
-        </a>
+        <div className="flex items-center gap-4">
+          <a href="/login" className="text-sm text-stone-600 hover:text-stone-900">
+            Sign in
+          </a>
+          <a
+            href="/signup"
+            className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+          >
+            Start free trial
+          </a>
+        </div>
       </header>
 
       <section className="mt-16 grid gap-12 md:grid-cols-2 md:items-center">
@@ -55,13 +60,13 @@ export default function LandingPage() {
           </ul>
           <div className="mt-10 flex items-center gap-4">
             <a
-              href="mailto:hello@docchaser.app"
+              href="/signup"
               className="rounded-md bg-brand-600 px-5 py-3 text-sm font-semibold text-white hover:bg-brand-700"
             >
-              Get early access
+              Start your 14-day trial
             </a>
             <span className="text-sm text-stone-500">
-              $25–40/mo per firm · built for solo & small-firm practices
+              $29/mo flat · unlimited clients · no credit card for the trial
             </span>
           </div>
         </div>

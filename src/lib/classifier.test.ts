@@ -31,6 +31,19 @@ describe("parseClassification", () => {
 
   it("degrades gracefully on unparseable input", () => {
     const result = parseClassification("not json at all");
-    expect(result).toEqual({ docType: null, period: null, entity: null, confidence: 0, raw: "not json at all" });
+    expect(result).toEqual({
+      docType: null,
+      period: null,
+      entity: null,
+      confidence: 0,
+      reason: null,
+      raw: "not json at all",
+    });
+  });
+
+  it("carries through a client-facing reason when the model flags something", () => {
+    const raw = `{"docType": "BANK_STATEMENT", "period": "2023", "confidence": 0.8, "reason": "This looks like a 2023 statement, not 2024 — can you resend the right year?"}`;
+    const result = parseClassification(raw);
+    expect(result.reason).toBe("This looks like a 2023 statement, not 2024 — can you resend the right year?");
   });
 });

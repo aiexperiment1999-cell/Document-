@@ -1,8 +1,13 @@
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
+const DEMO_PASSWORD = "password123";
+
 async function main() {
+  const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 12);
+
   const firm = await prisma.firm.upsert({
     where: { ownerEmail: "aiexperiment1999@gmail.com" },
     update: {},
@@ -11,6 +16,12 @@ async function main() {
       ownerEmail: "aiexperiment1999@gmail.com",
       timezone: "America/New_York",
     },
+  });
+
+  await prisma.user.upsert({
+    where: { email: "aiexperiment1999@gmail.com" },
+    update: {},
+    create: { firmId: firm.id, email: "aiexperiment1999@gmail.com", passwordHash },
   });
 
   const jamie = await prisma.client.upsert({
@@ -84,6 +95,7 @@ async function main() {
   });
 
   console.log(`Seeded firm "${firm.name}" with clients ${jamie.name} and ${priya.name}.`);
+  console.log(`Log in at /login with aiexperiment1999@gmail.com / ${DEMO_PASSWORD}`);
 }
 
 main()

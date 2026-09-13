@@ -57,8 +57,20 @@ model Firm {
   timezone    String   @default("America/New_York")
   createdAt   DateTime @default(now())
 
+  user              User?
   clients           Client[]
   documentRequests  DocumentRequest[]
+}
+
+// The accountant who signs in. One per Firm for now — the PRD's target
+// user is a solo practitioner, not a multi-seat firm.
+model User {
+  id           String   @id @default(cuid())
+  firmId       String   @unique
+  firm         Firm     @relation(fields: [firmId], references: [id])
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
 }
 
 model Client {
@@ -68,6 +80,7 @@ model Client {
   name        String
   phone       String
   preferredChannel Channel @default(SMS)
+  remindersPaused  Boolean @default(false)
   createdAt   DateTime @default(now())
 
   documentRequests   DocumentRequest[]
@@ -115,6 +128,7 @@ model IncomingDocument {
   classifiedEntity  String?       // e.g. employer or bank name found on the document
   confidence        Float?
   classificationRaw String?       // raw JSON response, kept for debugging/audit
+  flagReason        String?       // human-readable reason shown to the client when it doesn't clearly match anything
 
   matchedRequestId  String?
   matchedRequest    DocumentRequest? @relation(fields: [matchedRequestId], references: [id])

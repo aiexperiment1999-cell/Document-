@@ -37,6 +37,27 @@ export async function POST(req: NextRequest) {
   const mediaUrl = params.get("MediaUrl0")!;
   const mediaContentType = params.get("MediaContentType0") ?? "image/jpeg";
   const messageSid = params.get("MessageSid") ?? undefined;
+  const channel = isWhatsApp ? "WHATSAPP" : "SMS";
+
+  // Voice notes are in scope per the PRD but need a transcription step
+  // we haven't wired up yet (Claude's vision API doesn't take audio).
+  // Flag for manual review rather than crash on an unsupported media type.
+  if (mediaContentType.startsWith("audio/")) {
+    await prisma.incomingDocument.create({
+      data: {
+        clientId: client.id,
+        channel,
+        mediaUrl,
+        mediaContentType,
+        rawMessageSid: messageSid,
+        flagReason: "Voice note received — a team member will need to listen to this one.",
+        needsReview: true,
+      },
+    });
+    return twiml(
+      "Got your voice note — a team member will listen to it and follow up. In the meantime, a photo or PDF gets checked off automatically.",
+    );
+  }
 
   const mediaBase64 = await downloadTwilioMediaAsBase64(mediaUrl);
 
@@ -52,10 +73,10 @@ export async function POST(req: NextRequest) {
     openRequests,
   );
 
-  const incomingDocument = await prisma.incomingDocument.create({
+  await prisma.incomingDocument.create({
     data: {
       clientId: client.id,
-      channel: isWhatsApp ? "WHATSAPP" : "SMS",
+      channel,
       mediaUrl,
       mediaContentType,
       rawMessageSid: messageSid,
@@ -64,6 +85,7 @@ export async function POST(req: NextRequest) {
       classifiedEntity: classification.entity ?? undefined,
       confidence: classification.confidence,
       classificationRaw: classification.raw,
+      flagReason: matchedId ? undefined : classification.reason ?? undefined,
       matchedRequestId: matchedId ?? undefined,
       needsReview,
     },
@@ -75,16 +97,20 @@ export async function POST(req: NextRequest) {
       where: { id: matchedId },
       data: { status: "RECEIVED", receivedAt: new Date() },
     });
-    reply = `Got it — thanks! We've checked off "${matchedRequest.label}". `;
+    reply = `Got it — thanks! We've checked off "${matchedRequest.label}".`;
+  } else if (classification.reason) {
+    // A specific, client-facing reason from the classifier — e.g. "this
+    // looks like a 2023 statement, not 2024" — beats a generic apology.
+    reply = classification.reason;
   } else {
     reply =
-      "Thanks, we received that document. We're not sure which checklist item it covers, so someone from the team will take a look. ";
+      "Thanks, we received that document. We're not sure which checklist item it covers, so someone from the team will take a look.";
   }
 
-  return twiml(reply, incomingDocument.id);
+  return twiml(reply);
 }
 
-function twiml(message: string, _debugId?: string) {
+function twiml(message: string) {
   const body = `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${escapeXml(message)}</Message></Response>`;
   return new NextResponse(body, {
     status: 200,
